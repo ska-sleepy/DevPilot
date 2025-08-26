@@ -3,6 +3,7 @@ import sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from config import system_prompt
 
 load_dotenv()
 
@@ -13,10 +14,14 @@ if len(sys.argv) < 2:
     print("Enter your prompt with the run script")
     sys.exit(1)
 
-prompt = " ".join(sys.argv[1])
+args = sys.argv[1:]
 verbose_flag = False
-if len(sys.argv) > 2 and sys.argv[2] == "--verbose":
+
+if "--verbose" in args:
     verbose_flag = True
+    args.remove("--verbose")
+
+prompt = " ".join(args)
 
 messages = [
     types.Content(role="user", parts=[types.Part(text=prompt)]),
@@ -24,7 +29,7 @@ messages = [
 
 
 response = client.models.generate_content(
-    model='gemini-2.0-flash-001', contents= messages
+    model='gemini-2.0-flash-001', contents= messages,  config=types.GenerateContentConfig(system_instruction=system_prompt),
 )
 
 
