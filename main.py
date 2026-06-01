@@ -1,91 +1,87 @@
 import os
 import sys
 import traceback
+from groq import Groq
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
-from config import system_prompt
+from config import system_prompt, working_directory
 from functions.get_files_info import schema_get_files_info
 from functions.get_file_content import schema_get_file_content
 from functions.run_python_file import schema_run_python_file
 from functions.write_file import schema_write_file
 from functions.call_function import call_function
 
+
 def main():
     load_dotenv()
 
-    api_key = os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key)
+    api_key = os.environ.get("Groq_API_KEY")
+    client = Groq(api_key=api_key)
 
-    if len(sys.argv) < 2:
-        print("Enter your prompt with the run script")
-        sys.exit(1)
+    verbose_flag = "--verbose" in sys.argv
 
-    args = sys.argv[1:]
-    verbose_flag = False
-
-    if "--verbose" in args:
-        verbose_flag = True
-        args.remove("--verbose")
-
-    prompt = " ".join(args)
-
-    messages = [
-        types.Content(role="user", parts=[types.Part(text=prompt)]),
+    available_tools = [
+        schema_get_files_info,
+        schema_get_file_content,
+        schema_run_python_file,
+        schema_write_file,
     ]
 
-    available_functions = types.Tool(
-        function_declarations=[
-            schema_get_files_info,
-            schema_get_file_content,
-            schema_run_python_file,
-            schema_write_file
-        ]
-    )
-    for i in range(20):
+    messages = [
+        {"role": "system", "content": system_prompt},
+    ]
+
+    print(f"DevPilot (working dir: {working_directory}) — type 'exit' to quit")
+
+    while True:
         try:
-            response = client.models.generate_content(
-                model='gemini-2.0-flash-001', contents= messages,  config=types.GenerateContentConfig(
-                tools=[available_functions], system_instruction=system_prompt)
-            )
-            candidates = response.candidates
-            if candidates:
-                for candidate in candidates:
-                    messages.append(candidate.content)
-            
+            prompt = input("\nYou: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
+            break
 
-            if response.function_calls:
-                for function_call in response.function_calls:
-                    function_call_result = call_function(function_call, verbose_flag)
-                    if (
-                        not function_call_result.parts
-                        or not function_call_result.parts[0].function_response
-                    ):
-                        raise Exception("empty function call result")
-                    if verbose_flag:
-                        print(f"-> {function_call_result.parts[0].function_response.response}")
-                    messages.append(types.Content(
-                        role="user",
-                        parts=[
-                            types.Part.from_function_response(
-                                name=function_call_result.parts[0].function_response.name,
-                                response=function_call_result.parts[0].function_response.response,
-                            )
-                        ],
-                    ))
-                continue
+        if not prompt:
+            continue
+        if prompt.lower() in ("exit", "quit"):
+            print("Goodbye!")
+            break
 
-            elif response.text:
-                print("Final response:")
-                print(response.text)
+        messages.append({"role": "user", "content": prompt})
+
+        for i in range(20):
+            try:
+                response = client.chat.completions.create(
+                    model="meta-llama/llama-4-scout-17b-16e-instruct",
+                    messages=messages,
+                    tools=available_tools,
+                )
+
+                message = response.choices[0].message
+                messages.append(message)
+
+                if message.tool_calls:
+                    for tool_call in message.tool_calls:
+                        result = call_function(tool_call, verbose_flag)
+                        if verbose_flag:
+                            print(f"-> {result}")
+                        else:
+                            print("...", end="", flush=True)
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": str(result),
+                        })
+                    continue
+
+                elif message.content:
+                    print(f"\nDevPilot: {message.content}")
+                    break
+
+            except Exception as e:
+                print(f"Error: {e}")
+                if verbose_flag:
+                    traceback.print_exc()
                 break
 
-            
-        except Exception as e:
-            print(f"Error during iteration {i}: {e}")
-            if verbose_flag:
-                traceback.print_exc()
-            break
 
 if __name__ == "__main__":
     main()

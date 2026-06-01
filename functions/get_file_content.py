@@ -1,6 +1,5 @@
 import os
 from config import charatar_limit
-from google.genai import types
 
 def get_file_content(working_directory, file_path):
     try:
@@ -23,16 +22,20 @@ def get_file_content(working_directory, file_path):
     except Exception as e:
         return f"Error: {e}"
 
-schema_get_file_content = types.FunctionDeclaration(
-    name="get_file_content",
-    description="gets the content of the file in a specified directory with a limit of 100000 charatar, constained to the working directory",
-    parameters=types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            "file_path": types.Schema(
-                type=types.Type.STRING,
-                description="The filepath to get the file from relative to the working directory",
-            ),
+schema_get_file_content = {
+    "type": "function",
+    "function": {
+        "name": "get_file_content",
+        "description": "Gets the content of a file at the specified path, constrained to the working directory.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "The filepath to read, relative to the working directory.",
+                },
+            },
+            "required": ["file_path"],
         },
-    ),
-)
+    },
+}

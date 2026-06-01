@@ -1,5 +1,4 @@
 import os
-from google.genai import types
 def write_file(working_directory, file_path, content):
     try:
         file_path_dir = os.path.join(working_directory, file_path)
@@ -19,20 +18,24 @@ def write_file(working_directory, file_path, content):
         return f"Error: {e}"
     
 
-schema_write_file = types.FunctionDeclaration(
-    name="write_file",
-    description="Writes to a file in the specified filepath, if there isn't a file there file gets created located in the filepath , filepath constrained by the working_directory ",
-    parameters=types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            "file_path": types.Schema(
-                type=types.Type.STRING,
-                description="The filepath to get the file from relative to the working directory",
-            ),
-            "content": types.Schema(
-                type=types.Type.STRING,
-                description= "the content that is written to the file"
-            )
+schema_write_file = {
+    "type": "function",
+    "function": {
+        "name": "write_file",
+        "description": "Writes content to a file, creating it if it does not exist, constrained to the working directory.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "The filepath to write to, relative to the working directory.",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The content to write to the file.",
+                },
+            },
+            "required": ["file_path", "content"],
         },
-    ),
-)
+    },
+}
